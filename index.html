@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вход в чат — тест на адекватность</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=Onest:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#dff0e6;--ink:#16251f;--card:#fbfffc;--in:#ffffff;--out:#ffd23f;--accent:#6c4cff;--line:#16251f;--muted:#4d6359}
+@media (prefers-color-scheme:dark){:root{--bg:#10201a;--ink:#e8f5ee;--card:#17302a;--in:#1f3d35;--out:#ffd23f;--accent:#a493ff;--line:#e8f5ee;--muted:#9bb8aa}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 Onest,system-ui,sans-serif}
+main{max-width:720px;margin:0 auto;padding:28px 16px 64px}
+h1,h2{font-family:Unbounded,system-ui,sans-serif;line-height:1.15;margin:0}
+h1{font-size:clamp(28px,7vw,44px);font-weight:800}
+h2{font-size:22px;margin-bottom:14px}
+.lead{color:var(--muted);margin:12px 0 24px;max-width:56ch}
+.card{background:var(--card);border:2px solid var(--line);border-radius:18px;padding:20px;margin-bottom:32px;box-shadow:6px 6px 0 var(--line)}
+input{width:100%;font:inherit;padding:12px 14px;border:2px solid var(--line);border-radius:12px;background:var(--in);color:var(--ink)}
+button{font:inherit;cursor:pointer;color:var(--ink)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.go{margin-top:12px;padding:12px 22px;border:2px solid var(--line);border-radius:12px;background:var(--out);font-weight:600;box-shadow:3px 3px 0 var(--line)}
+.go:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--line)}
+.go:disabled{opacity:.5;cursor:not-allowed}
+#chat{display:flex;flex-direction:column;gap:10px}
+.msg{max-width:88%;padding:11px 15px;border:2px solid var(--line);border-radius:16px;white-space:pre-line}
+.msg.in{background:var(--in);border-bottom-left-radius:4px;align-self:flex-start}
+.msg.out{background:var(--out);color:#16251f;border-bottom-right-radius:4px;align-self:flex-end}
+.who{display:block;font-size:13px;font-weight:600;color:var(--accent);margin-bottom:2px}
+.opts{display:flex;flex-direction:column;gap:8px;align-items:flex-end;margin-top:4px}
+.opt{max-width:88%;text-align:left;padding:10px 14px;border:2px dashed var(--line);border-radius:16px;border-bottom-right-radius:4px;background:transparent}
+.opt:hover{background:var(--in);border-style:solid}
+.progress{font-size:14px;color:var(--muted);margin-bottom:12px}
+.verdict{text-align:center;padding:12px 0 4px}
+.stamp{display:inline-block;font:800 24px Unbounded,sans-serif;padding:10px 20px;border:4px solid currentColor;border-radius:10px;transform:rotate(-4deg);margin:6px 0 14px}
+.v-yes{color:#168a4a}.v-mid{color:#c27c00}.v-no{color:#d23a3a}
+@media (prefers-color-scheme:dark){.v-yes{color:#4be08c}.v-mid{color:#ffc247}.v-no{color:#ff7b7b}}
+.wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:16px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1.5px solid var(--line)}
+th{font-weight:600;color:var(--muted)}
+.note{font-size:14px;color:var(--muted);margin-top:10px}
+.hidden{display:none}
+@media (prefers-reduced-motion:no-preference){.msg{animation:pop .25s ease-out}@keyframes pop{from{opacity:0;transform:translateY(6px)}}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Вход в чат только для адекватных</h1>
+  <p class="lead">Девять ситуаций из жизни нашего чата. Правильных ответов никто не покажет — отвечай так, как поступил бы сам. В конце получишь вердикт, и его увидят все.</p>
+
+  <section class="card" id="start">
+    <label for="name"><b>Как тебя зовут?</b></label>
+    <input id="name" maxlength="24" placeholder="Имя или ник" autocomplete="off">
+    <button class="go" id="begin">Войти в чат</button>
+  </section>
+
+  <section class="card hidden" id="test">
+    <div class="progress" id="progress"></div>
+    <div id="chat" aria-live="polite"></div>
+    <div class="opts" id="opts"></div>
+  </section>
+
+  <section class="card hidden" id="final">
+    <div class="verdict">
+      <div class="stamp" id="stamp"></div>
+      <p id="verdictText"></p>
+      <p class="note" id="saveStatus"></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Таблица вердиктов</h2>
+    <div class="card"><div class="wrap">
+      <table>
+        <thead><tr><th>Кто</th><th>Вердикт</th><th>Адекватность</th><th>Когда</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="4">Загрузка…</td></tr></tbody>
+      </table>
+    </div>
+    <p class="note" id="modeNote"></p></div>
+  </section>
+</main>
+
+<script>
+/* ===== НАСТРОЙКА ОБЩЕЙ ТАБЛИЦЫ (см. инструкцию) =====
+   Пока поля пустые, результаты хранятся только в браузере. */
+const SUPABASE_URL = "https://kgwioveffprswrpgknyb.supabase.co";      // например https://abcd1234.supabase.co
+const SUPABASE_KEY = "sb_publishable_kwVK4AKCM91OjPFXiBxnPA_5ZQG4csp";      // anon public key
+/* ================================================== */
+
+const Q = [
+ {t:"Ты только вступил в чат. Двое участников жёстко спорят, и вдруг тебя тегают: «Ну а ты за кого?»",
+  o:[["Скажу, что не в курсе, и попрошу коротко объяснить суть",3],["Поддержу того, кто по существу прав",2],["Отвечу шуткой, чтобы разрядить обстановку",1],["Промолчу, пока всё не утихнет",1]]},
+ {t:"Друг уже сорок минут шлёт голосовые по пять минут каждое. Чат давно ушёл в другую тему.",
+  o:[["Прослушаю на двойной скорости и отвечу текстом",2],["Попрошу писать текстом и объясню почему",3],["Поставлю реакцию, не слушая",0],["Честно прослушаю всё и отвечу голосовым",1]]},
+ {t:"В три часа ночи чат взрывается уведомлениями из-за мема. Ты не спишь.",
+  o:[["Отвечу: мем-то отличный",1],["Тихо отключу звук чата до утра",3],["Напишу «ребят, ночь»",2],["Посмотрю, но отвечу только днём",2]]},
+ {t:"Популярный художник из чата выкладывает свою новую работу. Тебе она совсем не заходит. Он спрашивает: «Ну как?»",
+  o:[["Скажу, что это не моё, и объясню, что именно",3],["Напишу «огонь», чтобы не обидеть",1],["Отвечу уклончиво: «интересно, надо привыкнуть»",2],["Сделаю вид, что не заметил сообщение",1]]},
+ {t:"Художник в соцсетях публично высмеял работу малоизвестного автора. Чат это бурно обсуждает.",
+  o:[["Скажу, что так делать некрасиво, при любом таланте",3],["Талант даёт право на резкость",0],["Не вижу смысла обсуждать чужие конфликты",2],["Скину ссылку, посмотрим, что в комментариях",1]]},
+ {t:"Художник просит чат скинуться на материалы для выставки. Сумма не маленькая, подробностей нет.",
+  o:[["Дам небольшую сумму, если понятно, на что идёт",3],["Скину сколько просит: он же гений",1],["Откажусь, ничего не объясняя",2],["Спрошу детали прямо в общем чате",1]]},
+ {t:"Художник нарисовал шарж на тебя без спроса и выложил в чат. Выглядишь не лучшим образом, все смеются.",
+  o:[["Напишу ему лично, что мне неприятно, и попрошу убрать",3],["Посмеюсь со всеми и оставлю как есть",2],["Нарисую ответный шарж на него",1],["Потребую убрать при всех",1]]},
+ {t:"Новичок задал в чате глупый вопрос, и пара участников начала над ним подшучивать.",
+  o:[["Спокойно вступлюсь за него в чате",3],["Поддержу его в личке, в чате не буду вмешиваться",2],["Не лезу, это не моё дело",0],["Пошучу вместе со всеми, но аккуратно",1]]},
+ {t:"Админ удалил твоё сообщение и ничего не объяснил.",
+  o:[["Спрошу причину лично",3],["Возмущусь в общем чате",0],["Промолчу, но обижусь",1],["Перепишу помягче и отправлю снова",1]]}
+];
+const MAX = Q.length*3;
+const $ = id => document.getElementById(id);
+const shuffle = a => a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x[1]);
+const REMOTE = SUPABASE_URL && SUPABASE_KEY;
+let name="", score=0, i=0;
+
+function verdict(s){
+  const p = s/MAX;
+  if(p>=0.75) return {k:"yes",label:"ПРИНЯТ",text:"Ты нормальный человек. Ссылка на чат придёт от админа."};
+  if(p>=0.5)  return {k:"mid",label:"ИСПЫТАТЕЛЬНЫЙ СРОК",text:"Взять можно, но мы присмотримся. Первый месяц без громких решений."};
+  return {k:"no",label:"НЕ ПРИНЯТ",text:"Пока не подходишь. Можно пересдать, когда немного остынешь."};
+}
+
+function say(text,cls,who){
+  const d=document.createElement("div"); d.className="msg "+cls;
+  if(who){const w=document.createElement("span");w.className="who";w.textContent=who;d.appendChild(w)}
+  d.appendChild(document.createTextNode(text));
+  $("chat").appendChild(d); d.scrollIntoView({block:"nearest"});
+}
+
+function ask(){
+  $("progress").textContent = `Ситуация ${i+1} из ${Q.length}`;
+  say(Q[i].t,"in","Админ");
+  const box=$("opts"); box.innerHTML="";
+  shuffle(Q[i].o).forEach(([txt,pts])=>{
+    const b=document.createElement("button"); b.className="opt"; b.textContent=txt;
+    b.onclick=()=>pick(txt,pts); box.appendChild(b);
+  });
+}
+
+function pick(txt,pts){
+  score+=pts; $("opts").innerHTML="";
+  say(txt,"out"); i++;
+  if(i<Q.length) setTimeout(ask,450); else setTimeout(finish,450);
+}
+
+async function finish(){
+  $("test").classList.add("hidden");
+  const v=verdict(score), pct=Math.round(score/MAX*100);
+  $("stamp").textContent=v.label; $("stamp").className="stamp v-"+v.k;
+  $("verdictText").textContent=`${name}, ${v.text}`;
+  $("final").classList.remove("hidden");
+  $("saveStatus").textContent="Сохраняю результат…";
+  try{
+    await save({name,verdict:v.label,score:pct});
+    $("saveStatus").textContent="Результат записан в таблицу ниже.";
+  }catch(e){ $("saveStatus").textContent="Не удалось сохранить результат: "+e.message; }
+  load();
+}
+
+/* ===== хранилище ===== */
+const H=(extra={})=>{const h={apikey:SUPABASE_KEY,...extra};if(!SUPABASE_KEY.startsWith("sb_"))h.Authorization="Bearer "+SUPABASE_KEY;return h};
+async function save(r){
+  if(REMOTE){
+    const res=await fetch(SUPABASE_URL+"/rest/v1/results",{method:"POST",
+      headers:H({"Content-Type":"application/json",Prefer:"return=minimal"}),
+      body:JSON.stringify(r)});
+    if(!res.ok) throw new Error("ошибка "+res.status);
+  } else {
+    const a=JSON.parse(localStorage.getItem("results")||"[]");
+    a.unshift({...r,created_at:new Date().toISOString()});
+    localStorage.setItem("results",JSON.stringify(a));
+  }
+}
+async function fetchAll(){
+  if(REMOTE){
+    const res=await fetch(SUPABASE_URL+"/rest/v1/results?select=name,verdict,score,created_at&order=created_at.desc&limit=200",
+      {headers:H()});
+    if(!res.ok) throw new Error("ошибка "+res.status);
+    return res.json();
+  }
+  return JSON.parse(localStorage.getItem("results")||"[]");
+}
+async function load(){
+  const tb=$("rows");
+  $("modeNote").textContent = REMOTE ? "" : "Общая база пока не подключена: результаты видны только в этом браузере.";
+  try{
+    const a=await fetchAll(); tb.innerHTML="";
+    if(!a.length){tb.innerHTML='<tr><td colspan="4">Пока никто не проходил тест.</td></tr>';return}
+    a.forEach(r=>{
+      const tr=document.createElement("tr");
+      [r.name,r.verdict,r.score+"%",new Date(r.created_at).toLocaleDateString("ru-RU")].forEach(t=>{
+        const td=document.createElement("td"); td.textContent=t; tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+  }catch(e){ tb.innerHTML='<tr><td colspan="4">Не удалось загрузить таблицу: '+e.message+'</td></tr>'; }
+}
+
+$("begin").onclick=()=>{
+  name=$("name").value.trim();
+  if(!name){$("name").focus();return}
+  $("start").classList.add("hidden"); $("test").classList.remove("hidden");
+  score=0;i=0; ask();
+};
+$("name").addEventListener("keydown",e=>{if(e.key==="Enter")$("begin").click()});
+load();
+</script>
+</body>
+</html>
